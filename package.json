@@ -1,0 +1,22 @@
+{
+  "name": "pi-global-orchestrator",
+  "version": "2.0.0",
+  "description": "Global Pi extension that adds orchestration commands, packet state, and enforcement gates for multi-slice delegated work with pi-subagents.",
+  "author": "Meloq-Arai",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-agent-core": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  }
+}

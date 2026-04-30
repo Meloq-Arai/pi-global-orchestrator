@@ -45,11 +45,34 @@ Global Pi extension that adds a lightweight orchestration layer across repositor
 6. Approve whole packet with `/orch-review approve`.
 7. Clear state with `/orch-clear`.
 
+## Recommended Agent Configuration
+
+Deploy user-level agent overrides at `~/.pi/agent/agents/` to pair with the orchestrator:
+
+| Agent | Model | Thinking | Role |
+|-------|-------|----------|------|
+| `scout` | `deepseek-v4-flash` | `medium` | Fast recon — grep/read/find only, no writes |
+| `planner` | `deepseek-v4-pro` | `high` | Turn recon + requirements into dispatchable plans |
+| `worker` | `deepseek-v4-pro` | `high` | Implement one narrow slice, follow existing patterns |
+| `reviewer` | `deepseek-v4-pro` | `high` | Validate against plan, fix only real issues |
+
+Keep agent prompts lean (~20 lines). Remove orch-specific ceremony — the orchestrator injects protocol instructions via the task string. Focus each agent on its role: what to do, how to do it, and the output format.
+
+## Performance: Fast Path vs Full Pipeline
+
+The orchestrator supports a fast path for simple work — skip scout, planner, and reviewer, dispatch a single worker directly:
+
+- **Fast Path**: ≤3 files, follows existing patterns, no new domain types or DB schema, low risk. One `subagent({ agent: "worker" })` call.
+- **Full Pipeline**: Multi-module changes, new types, DB migrations, high risk or unknown territory. `scout → planner → worker(s) → reviewer(s)`.
+
+Default to fast path. Only pull the full pipeline when complexity genuinely demands it. For multi-slice work, dispatch independent slices in parallel.
+
 ## Notes
 - This extension is global because it lives under `~/.pi/agent/extensions/orchestrator/`.
 - It does not replace `pi-subagents`; it orchestrates around it.
-- The strongest path is to pair it with your global `scout`, `planner`, `worker`, and `reviewer` agents.
+- Pair with user-level agent overrides (`~/.pi/agent/agents/`) for `scout`, `planner`, `worker`, and `reviewer`.
 
 ## Changelog
+- **v2.1**: Added recommended agent configuration (deepseek-v4-pro/flash, thinking levels, lean prompts). Added fast path vs full pipeline guidance. Scout on flash for recon speed.
 - **v2**: Added worktree compliance gate, reviewer gate (`review`, `approve_review`, `/orch-review`), `awaiting-review` status, `reviewedBy` and `reviewApproved` fields, and updated protocol to enforce slices and review.
 - **v1**: Initial release with `/orch`, `/orch-status`, `/orch-clear`, `orch_packet` tool, high-risk approval gate, and subagent result capture.

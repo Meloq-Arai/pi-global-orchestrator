@@ -1,6 +1,6 @@
 {
   "name": "pi-global-orchestrator",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Global Pi extension that adds orchestration commands, packet state, and enforcement gates for multi-slice delegated work with pi-subagents.",
   "author": "Meloq-Arai",
   "license": "MIT",

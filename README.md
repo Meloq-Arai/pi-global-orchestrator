@@ -73,6 +73,7 @@ Default to fast path. Only pull the full pipeline when complexity genuinely dema
 - Pair with user-level agent overrides (`~/.pi/agent/agents/`) for `scout`, `planner`, `worker`, and `reviewer`.
 
 ## Changelog
+- **v2.2**: Added auto-continue after reviewer "Ready" verdict. Redesigned widget & footer — emoji status icons, removed UUID noise, collapsed header into a single human-readable title line, per-slice lines now show only `icon title (agent) · reviewed` with risk/worktree surfaced only when notable.
 - **v2.1**: Added recommended agent configuration (deepseek-v4-pro/flash, thinking levels, lean prompts). Added fast path vs full pipeline guidance. Scout on flash for recon speed.
 - **v2**: Added worktree compliance gate, reviewer gate (`review`, `approve_review`, `/orch-review`), `awaiting-review` status, `reviewedBy` and `reviewApproved` fields, and updated protocol to enforce slices and review.
 - **v1**: Initial release with `/orch`, `/orch-status`, `/orch-clear`, `orch_packet` tool, high-risk approval gate, and subagent result capture.

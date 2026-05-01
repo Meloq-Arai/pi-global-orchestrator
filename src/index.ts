@@ -29,7 +29,7 @@ import {
 const STATE_TYPE = "orch-packet-state";
 const STATUS_KEY = "orch";
 const WIDGET_KEY = "orch-slices";
-const MAX_WIDGET_SLICES = 6;
+const MAX_WIDGET_SLICES = 5;
 
 const RiskSchema = StringEnum(["low", "medium", "high"] as const, {
   description: "Risk level for a delegated slice",
@@ -103,36 +103,54 @@ type PacketStateEntry = {
   data?: { packet: RootPacket | null };
 };
 
+function statusIcon(status: string): string {
+  switch (status) {
+    case "completed":
+    case "reviewed":
+      return "✅";
+    case "running":
+      return "⏳";
+    case "failed":
+      return "❌";
+    case "blocked":
+      return "⚠";
+    default:
+      return "⬚";
+  }
+}
+
 function packetLines(packet: RootPacket): string[] {
-  const completed = packet.slices.filter((slice) => slice.status === "completed" || slice.status === "reviewed").length;
-  const failed = packet.slices.filter((slice) => slice.status === "failed").length;
-  const reviewed = packet.slices.filter((slice) => slice.reviewedBy !== undefined).length;
-  const header = [
-    `id=${packet.id}`,
-    `mode=${packet.mode}`,
-    `status=${packet.status}`,
-    `slices=${completed}/${packet.slices.length}`,
-    `reviewed=${reviewed}`,
-  ];
-  if (failed > 0) header.push(`failed=${failed}`);
-  if (packet.reviewApproved) header.push("review-approved");
-  if (packet.pendingLaunch) {
-    header.push(
-      `pending=${packet.pendingLaunch.sliceId}:${packet.pendingLaunch.agent}:${packet.pendingLaunch.risk}:${packet.pendingLaunch.executionMode}`,
+  const completed = packet.slices.filter((s) => s.status === "completed" || s.status === "reviewed").length;
+  const failed = packet.slices.filter((s) => s.status === "failed").length;
+  const reviewed = packet.slices.filter((s) => s.reviewedBy !== undefined).length;
+  const total = packet.slices.length;
+
+  const title = packet.summary
+    ? packet.summary
+    : summarizeText(packet.request, 80);
+
+  let statusLine = `⚙ ${title} — ${completed}/${total} done · ${packet.status}`;
+  if (reviewed > 0) statusLine += ` · ${reviewed} reviewed`;
+  if (failed > 0) statusLine += ` · ${failed} failed`;
+  if (packet.reviewApproved) statusLine += ` · approved`;
+
+  const lines: string[] = [statusLine];
+
+  for (const slice of packet.slices.slice(0, MAX_WIDGET_SLICES)) {
+    const icon = statusIcon(slice.status);
+    const reviewedBadge = slice.reviewedBy ? " · reviewed" : "";
+    const riskBadge = slice.risk === "high" ? " ⚠ high-risk" : slice.risk === "medium" ? " · medium" : "";
+    const modeBadge = slice.executionMode === "worktree" ? " 🔄 worktree" : "";
+
+    lines.push(
+      `  ${icon} ${summarizeText(slice.title, 60)} (${slice.agent})${reviewedBadge}${riskBadge}${modeBadge}`,
     );
   }
 
-  const lines = [header.join(" | "), `request: ${summarizeText(packet.request, 140)}`];
-  if (packet.summary) lines.push(`summary: ${packet.summary}`);
-  for (const slice of packet.slices.slice(0, MAX_WIDGET_SLICES)) {
-    const reviewBadge = slice.reviewedBy ? `[rv:${slice.reviewedBy}]` : "";
-    lines.push(
-      `- ${slice.id} [${slice.status}] ${slice.agent} ${slice.executionMode} ${slice.risk}${reviewBadge} :: ${summarizeText(slice.title, 80)}`,
-    );
-  }
   if (packet.slices.length > MAX_WIDGET_SLICES) {
-    lines.push(`- ... ${packet.slices.length - MAX_WIDGET_SLICES} more slice(s)`);
+    lines.push(`  ⬚ ... ${packet.slices.length - MAX_WIDGET_SLICES} more`);
   }
+
   return lines;
 }
 
@@ -162,7 +180,7 @@ function buildKickoffPrompt(packet: RootPacket): string {
       : "subagent is unavailable in this session. Stay in advice/plan mode and do not pretend to delegate.";
 
   return [
-    "[ORCHESTRATION PACKET ACTIVE v2]",
+    "[ORCHESTRATION PACKET ACTIVE v2.2]",
     `Packet id: ${packet.id}`,
     `Mode: ${packet.mode}`,
     modeLine,
@@ -176,7 +194,8 @@ function buildKickoffPrompt(packet: RootPacket): string {
     "6. After each delegated run, record the handoff and any notes back into orch_packet.",
     "7. Keep verification and unresolved risk explicit.",
     "8. Before completing, call orch_packet with action=review for each completed slice, or use action=approve_review to sign off on the whole packet.",
-    "9. End with the next best integration/review step, not fluff.",
+    "9. AUTO-CONTINUE: After a reviewer subagent validates a worker's output and returns a 'Ready' verdict, immediately proceed to the next slice without asking the user. Only pause for human input when: (a) a high-risk slice needs approval via the high-risk gate, (b) the reviewer flags issues needing human judgment, or (c) the plan must change materially.",
+    "10. End with the next best integration/review step, not fluff.",
     "",
     "Current packet:",
     ...packetLines(packet),
@@ -198,7 +217,6 @@ export default function orchestratorExtension(pi: ExtensionAPI) {
     }
 
     const completed = activePacket.slices.filter((s) => s.status === "completed" || s.status === "reviewed").length;
-    const reviewed = activePacket.slices.filter((s) => s.reviewedBy !== undefined).length;
     const statusColor =
       activePacket.status === "awaiting-approval"
         ? "warning"
@@ -207,7 +225,7 @@ export default function orchestratorExtension(pi: ExtensionAPI) {
           : "accent";
     const footer = ctx.ui.theme.fg(
       statusColor,
-      `orch:${activePacket.mode}:${activePacket.status}:${completed}/${activePacket.slices.length}:rv${reviewed}`,
+      `⚙ ${completed}/${activePacket.slices.length} · ${activePacket.status}`,
     );
     ctx.ui.setStatus(STATUS_KEY, footer);
     ctx.ui.setWidget(WIDGET_KEY, packetLines(activePacket));
